@@ -1108,11 +1108,10 @@ class Ldap
             $filter = $filter->toString();
         }
 
+        $resource = $this->getResource();
         if(!$this->getOptions()['usePagination']){
-          $resource = $this->getResource();
           do {
             ErrorHandler::start(E_WARNING);
-
             switch ($scope) {
               case self::SEARCH_SCOPE_ONE:
                 $search = ldap_list($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
@@ -1143,12 +1142,30 @@ class Ldap
             ldap_control_paged_result($resource, $pageSize, true, $cookie);
 
             $resultHandle  = ldap_search($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
-            $pagedEntries = ldap_get_entries($resource, $resultHandle);
 
-            foreach ($pagedEntries as $entry) {
-              $entries[] = $entry;
+            // this is copy paste code from the DefaultIterator to build the internal
+            // entries array for the iterator, we need to do it for every page
+            // <copy-pasta>
+            $identifier = ldap_first_entry(
+              $resource,
+              $resultHandle
+            );
+
+            while (false !== $identifier) {
+              $entries[] = [
+                'resource' => $identifier,
+                'sortValue' => '',
+              ];
+
+              $identifier = ldap_next_entry(
+                $resource,
+                $identifier
+              );
             }
+            // </copy-pasta>
 
+            // cookie contains the pagination state and will be handled by ldap.
+            // when there are no more pages left to fetch the value will be set to ''
             ldap_control_paged_result_response($resource, $resultHandle, $cookie);
 
           } while($cookie !== null && $cookie != '');
