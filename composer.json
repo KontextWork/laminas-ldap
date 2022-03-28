@@ -19,9 +19,27 @@
     "sort-packages": true,
     "platform": {
       "php": "7.3.99"
+    },
+    "allow-plugins": {
+      "elendev/composer-push": true
     }
   },
-  "extra": {},
+  "extra": {
+    "push": [
+      {
+        "name": "prod",
+        "type": "nexus",
+        "ssl-verify": true,
+        "url": "https://nexus.kw.kontextwork.com/repository/kw-composer-release/",
+        "ignore-by-git-attributes": true,
+        "ignore": [
+          "composer.phar",
+          "ldap_client_php.iml",
+          ".idea"
+        ]
+      }
+    ]
+  },
   "require": {
     "php": "^7.3 || ~8.0.0 || ~8.1.0",
     "ext-ldap": "*"
@@ -34,7 +52,8 @@
     "php-mock/php-mock-phpunit": "^2.6.0",
     "phpunit/phpunit": "^9.5.19",
     "psalm/plugin-phpunit": "^0.16.1",
-    "vimeo/psalm": "^4.22.0"
+    "vimeo/psalm": "^4.22.0",
+    "elendev/composer-push": "*"
   },
   "suggest": {
     "laminas/laminas-eventmanager": "Laminas\\EventManager component"
