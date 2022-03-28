@@ -267,6 +267,8 @@ class Ldap
             'reconnectAttempts'      => 0,
             'networkTimeout'         => null,
             'saslOpts'               => null,
+            'usePagination'          => false,
+            'pageSize'               => 250
         ];
 
         foreach ($permittedOptions as $key => $val) {
@@ -280,13 +282,15 @@ class Ldap
                     case 'port':
                     case 'accountCanonicalForm':
                     case 'reconnectAttempts':
+                    case 'pageSize':
                     case 'networkTimeout':
-                        $permittedOptions[$key] = (int) $val;
-                        break;
+                          $permittedOptions[$key] = (int) $val;
+                          break;
                     case 'useSsl':
                     case 'bindRequiresDn':
                     case 'allowEmptyPassword':
                     case 'useStartTls':
+                    case 'usePagination':
                     case 'optReferrals':
                     case 'tryUsernameSplit':
                         $permittedOptions[$key] = ($val === true
@@ -296,7 +300,7 @@ class Ldap
                     case 'saslOpts':
                         $permittedOptions[$key] = $val;
                         break;
-                    default:
+                  default:
                         $permittedOptions[$key] = trim((string) $val);
                         break;
                 }
@@ -1104,30 +1108,71 @@ class Ldap
             $filter = $filter->toString();
         }
 
-        do {
-            $resource = $this->getResource();
+        $resource = $this->getResource();
+        if(!$this->getOptions()['usePagination']){
+          do {
             ErrorHandler::start(E_WARNING);
-
             switch ($scope) {
-                case self::SEARCH_SCOPE_ONE:
-                    $search = ldap_list($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
-                    break;
-                case self::SEARCH_SCOPE_BASE:
-                    $search = ldap_read($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
-                    break;
-                case self::SEARCH_SCOPE_SUB:
-                default:
-                    $search = ldap_search($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
-                    break;
+              case self::SEARCH_SCOPE_ONE:
+                $search = ldap_list($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
+                break;
+              case self::SEARCH_SCOPE_BASE:
+                $search = ldap_read($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
+                break;
+              case self::SEARCH_SCOPE_SUB:
+              default:
+                $search = ldap_search($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
+                break;
             }
             ErrorHandler::stop();
-        } while ($search === false && $this->shouldReconnect($resource));
+          } while ($search === false && $this->shouldReconnect($resource));
 
-        if ($search === false) {
+          if ($search === false) {
             throw new Exception\LdapException($this, 'searching: ' . $filter);
-        }
+          }
 
-        $iterator = new Collection\DefaultIterator($this, $search);
+          $iterator = new Collection\DefaultIterator($this, $search);
+        } else {
+          $pageSize = $this->getOptions()['pageSize'];
+
+          $cookie = '';
+          $entries = [];
+          ErrorHandler::start(E_WARNING);
+          do {
+            ldap_control_paged_result($resource, $pageSize, true, $cookie);
+
+            $resultHandle  = ldap_search($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
+
+            // this is copy paste code from the DefaultIterator to build the internal
+            // entries array for the iterator, we need to do it for every page
+            // <copy-pasta>
+            $identifier = ldap_first_entry(
+              $resource,
+              $resultHandle
+            );
+
+            while (false !== $identifier) {
+              $entries[] = [
+                'resource' => $identifier,
+                'sortValue' => '',
+              ];
+
+              $identifier = ldap_next_entry(
+                $resource,
+                $identifier
+              );
+            }
+            // </copy-pasta>
+
+            // cookie contains the pagination state and will be handled by ldap.
+            // when there are no more pages left to fetch the value will be set to ''
+            ldap_control_paged_result_response($resource, $resultHandle, $cookie);
+            ldap_free_result($resultHandle);
+          } while($cookie !== null && $cookie != '');
+          ErrorHandler::stop();
+
+          $iterator = new Collection\LdapPaginatedIterator($this, $entries);
+        }
 
         if ($sort !== null && is_string($sort)) {
             $iterator->sort($sort);

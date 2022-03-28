@@ -128,7 +128,7 @@ class DefaultIterator implements Iterator, Countable
     public function close()
     {
         $isClosed = false;
-        if (Handler::isResultHandle($this->resultId)) {
+        if ($this->resultId != null && Handler::isResultHandle($this->resultId)) {
             ErrorHandler::start();
             $isClosed       = ldap_free_result($this->resultId);
             ErrorHandler::stop();
