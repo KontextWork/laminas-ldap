@@ -1167,7 +1167,7 @@ class Ldap
             // cookie contains the pagination state and will be handled by ldap.
             // when there are no more pages left to fetch the value will be set to ''
             ldap_control_paged_result_response($resource, $resultHandle, $cookie);
-
+            ldap_free_result($resultHandle);
           } while($cookie !== null && $cookie != '');
           ErrorHandler::stop();
 
