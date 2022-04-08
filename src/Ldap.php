@@ -1138,11 +1138,13 @@ class Ldap
           $cookie = '';
           $entries = [];
           ErrorHandler::start(E_WARNING);
+          $resultHandles = [];
           do {
             ldap_control_paged_result($resource, $pageSize, true, $cookie);
 
             $resultHandle  = ldap_search($resource, $basedn, $filter, $attributes, 0, $sizelimit, $timelimit);
-
+            // Gather all the result handles so we can later free them in the deconstruction of the iterator.
+            $resultHandles[] = $resultHandle;
             // this is copy paste code from the DefaultIterator to build the internal
             // entries array for the iterator, we need to do it for every page
             // <copy-pasta>
@@ -1167,11 +1169,10 @@ class Ldap
             // cookie contains the pagination state and will be handled by ldap.
             // when there are no more pages left to fetch the value will be set to ''
             ldap_control_paged_result_response($resource, $resultHandle, $cookie);
-            ldap_free_result($resultHandle);
           } while($cookie !== null && $cookie != '');
           ErrorHandler::stop();
 
-          $iterator = new Collection\LdapPaginatedIterator($this, $entries);
+          $iterator = new Collection\LdapPaginatedIterator($this, $entries, $resultHandles);
         }
 
         if ($sort !== null && is_string($sort)) {
