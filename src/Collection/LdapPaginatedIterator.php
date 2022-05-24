@@ -15,11 +15,7 @@ class LdapPaginatedIterator extends DefaultIterator {
   private $resultHandles;
 
   /** @noinspection PhpMissingParentConstructorInspection */
-  public function __construct(Ldap $ldap, $entries, array $resultHandles) {
-    if($entries == null){
-      throw new LdapException($this->ldap, 'No entries given');
-    }
-
+  public function __construct(Ldap $ldap, array $entries, array $resultHandles) {
     $this->entries = $entries;
     $this->ldap = $ldap;
 
